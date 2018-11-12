@@ -16,11 +16,13 @@ resource "docker_container" "wp_1" {
   image = "${docker_image.wp.latest}"
   name  = "wp_1"
   networks = [
-    "${docker_network.wordpress_network.id}"
+    "${docker_network.wordpress_network.id}",
+    "${docker_network.web_network.id}"
   ]
-  ports {
-    internal = 80
-    external = 8080
+  volumes {
+    host_path = "${dirname(path.cwd)}/wordpress_project/configs/apache/default.conf"
+    container_path = "/etc/apache/sites-enabled/default.conf"
+    read_only = true
   }
   env = [
     "WORDPRESS_DB_HOST=${docker_container.mysql_1.name}",
@@ -60,6 +62,23 @@ resource "docker_container" "mysql_1" {
   }
 }
 
+resource "docker_container" "web_proxy" {
+  image = "${docker_image.nginx.latest}"
+  name = "nginx_1"
+  networks = [
+    "${docker_network.web_network.id}"
+  ]
+  ports {
+    internal = 80
+    external = 80
+  }
+  volumes {
+    host_path = "${dirname(path.cwd)}/wordpress_project/configs/nginx/default.conf"
+    container_path = "/etc/nginx/conf.d/default.conf"
+    read_only = true
+  }
+}
+
 resource "docker_image" "wp" {
   name = "wordpress:php7.1"
 }
@@ -68,10 +87,18 @@ resource "docker_image" "mysql" {
   name = "mysql:8"
 }
 
+resource "docker_image" "nginx" {
+  name = "nginx:1.15"
+}
+
 resource "docker_volume" "mysql" {
   name = "data"
 }
 
 resource "docker_network" "wordpress_network" {
   name = "wp_network"
+}
+
+resource "docker_network" "web_network" {
+  name = "web_network"
 }
